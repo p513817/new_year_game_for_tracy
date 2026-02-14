@@ -1,4 +1,400 @@
-ㄋesetBtn">再刮一張</button>
+﻿<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026 樺專用刮刮樂</title>
+    <style>
+        :root {
+            --card-w: min(92vw, 520px);
+            --card-h: var(--card-w);
+            --gold-1: #ffe7a8;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Noto Serif TC", "PMingLiU", "Microsoft JhengHei", serif;
+            background:
+                radial-gradient(circle at 15% 20%, rgba(255, 225, 120, .22), transparent 32%),
+                radial-gradient(circle at 84% 18%, rgba(255, 189, 95, .18), transparent 28%),
+                radial-gradient(circle at 50% 110%, rgba(255, 120, 90, .32), transparent 35%),
+                linear-gradient(150deg, #5f0007 0%, #8f070d 38%, #b11514 100%);
+            color: #fff5e6;
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            padding: 22px 14px 28px;
+            box-sizing: border-box;
+        }
+
+        .wrap {
+            width: min(96vw, 640px);
+            text-align: center;
+        }
+
+        .hero-year {
+            margin: 0;
+            color: var(--gold-1);
+            font-weight: 900;
+            font-size: clamp(30px, 7.4vw, 48px);
+            letter-spacing: .08em;
+            text-shadow: 0 3px 0 rgba(78, 12, 1, .72), 0 12px 28px rgba(0, 0, 0, .35);
+        }
+
+        h1 {
+            margin: 6px 0 12px;
+            font-size: clamp(28px, 6.8vw, 44px);
+            font-weight: 900;
+            line-height: 1.15;
+            color: #fff7d4;
+            text-shadow: 0 3px 0 rgba(89, 13, 4, .8), 0 10px 24px rgba(0, 0, 0, .35);
+        }
+
+        .hint {
+            color: #fff0ca;
+            font-size: 15px;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .card {
+            position: relative;
+            width: var(--card-w);
+            height: var(--card-h);
+            border-radius: 22px;
+            overflow: hidden;
+            background: linear-gradient(140deg, #9e0f10, #b21616 55%, #870d0d);
+            box-shadow: 0 18px 50px rgba(21, 2, 1, .44), 0 0 0 3px rgba(255, 208, 110, .42);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            margin: 0 auto;
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border: 3px solid rgba(255, 226, 154, .5);
+            pointer-events: none;
+            border-radius: inherit;
+            z-index: 3;
+        }
+
+        .card.jackpot {
+            animation: jackpot-card-glow 0.9s ease-in-out infinite alternate;
+        }
+
+        .card.jackpot::before {
+            border-color: rgba(255, 236, 167, .98);
+            box-shadow:
+                0 0 14px rgba(255, 211, 90, .95),
+                0 0 34px rgba(255, 176, 50, .76),
+                inset 0 0 14px rgba(255, 240, 185, .52);
+            animation: jackpot-border-blink 0.34s steps(2, end) infinite;
+        }
+
+        @keyframes jackpot-card-glow {
+            0% {
+                box-shadow: 0 18px 50px rgba(21, 2, 1, .44), 0 0 0 3px rgba(255, 208, 110, .42);
+            }
+
+            100% {
+                box-shadow:
+                    0 18px 50px rgba(21, 2, 1, .44),
+                    0 0 0 4px rgba(255, 229, 138, .96),
+                    0 0 24px rgba(255, 199, 68, .85),
+                    0 0 52px rgba(255, 151, 20, .58);
+            }
+        }
+
+        @keyframes jackpot-border-blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .58;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .card.jackpot {
+                animation: none;
+            }
+
+            .card.jackpot::before {
+                animation: none;
+            }
+        }
+
+        .prize-layer {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            padding: 30px 28px;
+            text-align: center;
+            background:
+                radial-gradient(circle at 30% 20%, rgba(255, 247, 194, .25), transparent 35%),
+                linear-gradient(150deg, #b20f14 0%, #d9301c 46%, #a90f11 100%);
+            z-index: 1;
+        }
+
+        .prize-title {
+            font-size: 15px;
+            color: #ffecba;
+            letter-spacing: .08em;
+        }
+
+        .prize {
+            margin-top: 10px;
+            font-size: clamp(28px, 7vw, 38px);
+            font-weight: 900;
+            line-height: 1.15;
+            color: #fff7d8;
+            text-shadow: 0 2px 0 rgba(95, 5, 4, .75);
+        }
+
+        .sub {
+            margin-top: 10px;
+            font-size: 15px;
+            color: #ffe8b3;
+        }
+
+        canvas#scratch {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 2;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: 0;
+            border-radius: 12px;
+            padding: 11px 16px;
+            background: linear-gradient(135deg, #ffda82, #ffbe3f);
+            color: #5d0c05;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 0 rgba(135, 65, 0, .52);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #ffd6a2, #ffab75);
+            color: #5f1207;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 14px;
+            color: #fff3d3;
+            min-height: 1.2em;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255, 237, 168, .18);
+            margin-left: 6px;
+            font-size: 12px;
+            color: #fff8df;
+        }
+
+        .blessing {
+            margin-top: 10px;
+            font-size: 16px;
+            color: #ffe7b8;
+            font-weight: 700;
+            letter-spacing: .05em;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+        }
+
+        .summary-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1200;
+            display: none;
+            align-items: center;
+            justify-items: center;
+            background:
+                radial-gradient(circle at 20% 15%, rgba(255, 217, 120, .24), transparent 34%),
+                radial-gradient(circle at 80% 85%, rgba(255, 183, 96, .22), transparent 32%),
+                rgba(28, 2, 2, .68);
+            backdrop-filter: blur(2px);
+            padding: 18px;
+            box-sizing: border-box;
+        }
+
+        .summary-modal.show {
+            display: grid;
+        }
+
+        .summary-card {
+            width: min(92vw, 460px);
+            border-radius: 20px;
+            border: 2px solid rgba(255, 223, 152, .88);
+            background:
+                radial-gradient(circle at 15% 10%, rgba(255, 228, 149, .34), transparent 30%),
+                linear-gradient(160deg, #7e0708 0%, #b21414 45%, #8a0d0d 100%);
+            color: #fff5de;
+            box-shadow:
+                0 24px 46px rgba(0, 0, 0, .42),
+                0 0 0 2px rgba(255, 204, 108, .32),
+                0 0 32px rgba(255, 173, 60, .35);
+            overflow: hidden;
+        }
+
+        .summary-head {
+            padding: 16px 18px 10px;
+            border-bottom: 1px solid rgba(255, 228, 167, .28);
+            background: linear-gradient(180deg, rgba(255, 226, 147, .15), rgba(255, 226, 147, 0));
+        }
+
+        .summary-title {
+            margin: 0;
+            font-size: clamp(24px, 5.6vw, 30px);
+            font-weight: 900;
+            letter-spacing: .08em;
+            color: #fff2c8;
+            text-shadow: 0 2px 0 rgba(100, 12, 2, .7), 0 8px 20px rgba(0, 0, 0, .28);
+        }
+
+        .summary-sub {
+            margin-top: 6px;
+            font-size: 14px;
+            color: #ffe7b6;
+        }
+
+        .summary-list {
+            margin: 0;
+            padding: 14px 18px 6px;
+            list-style: none;
+        }
+
+        .summary-item {
+            display: grid;
+            grid-template-columns: 28px 1fr;
+            gap: 10px;
+            align-items: start;
+            padding: 10px 0;
+            border-bottom: 1px dashed rgba(255, 226, 156, .25);
+        }
+
+        .summary-item:last-child {
+            border-bottom: 0;
+        }
+
+        .summary-index {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            font-size: 12px;
+            color: #6c1a00;
+            background: linear-gradient(160deg, #ffe6a6, #ffc64f);
+            box-shadow: inset 0 -1px 0 rgba(152, 90, 0, .45);
+        }
+
+        .summary-prize {
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff4d4;
+        }
+
+        .summary-note {
+            margin-top: 3px;
+            font-size: 13px;
+            color: #ffdca6;
+            opacity: .92;
+        }
+
+        .summary-actions {
+            padding: 12px 18px 18px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .summary-confirm {
+            min-width: 120px;
+            padding: 10px 16px;
+            border-radius: 12px;
+            border: 0;
+            font-size: 15px;
+            font-weight: 800;
+            color: #651503;
+            cursor: pointer;
+            background: linear-gradient(160deg, #ffe5a0, #ffc445);
+            box-shadow: 0 4px 0 rgba(133, 69, 0, .48);
+        }
+
+        .summary-confirm:active {
+            transform: translateY(1px);
+        }
+
+        @media (max-width: 560px) {
+            .prize-layer {
+                padding: 24px 20px;
+            }
+
+            .prize {
+                font-size: clamp(24px, 8.2vw, 34px);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <p class="hero-year">2026</p>
+        <h1>馬力 Max 好運 Max</h1>
+        <div class="hint">
+            刮開新春封面，馬到成功、好運滿滿！
+            <span class="badge" id="progressBadge">0%</span>
+            <span class="badge" id="drawsBadge">剩餘 3 次</span>
+        </div>
+
+        <div class="card" id="card">
+            <div class="prize-layer">
+                <div>
+                    <div class="prize-title">你抽到的獎品</div>
+                    <div class="prize" id="prizeText">—</div>
+                    <div class="sub" id="prizeSub">刮開才知道～</div>
+                </div>
+            </div>
+            <canvas id="scratch"></canvas>
+        </div>
+
+        <div class="controls">
+            <button id="resetBtn">再刮一張</button>
             <button class="secondary" id="revealBtn">馬上揭曉</button>
             <button class="secondary" id="hardResetBtn">重製（需密碼）</button>
         </div>
@@ -7,8 +403,20 @@
         <div class="blessing">Max Chang 祝你新年快樂 !</div>
     </div>
 
+    <div class="summary-modal" id="summaryModal" aria-hidden="true">
+        <div class="summary-card">
+            <div class="summary-head">
+                <h2 class="summary-title">新春刮刮樂結果</h2>
+                <div class="summary-sub">恭喜完成 3 次抽獎，祝你今年好運旺旺來</div>
+            </div>
+            <ul class="summary-list" id="summaryList"></ul>
+            <div class="summary-actions">
+                <button type="button" class="summary-confirm" id="summaryConfirmBtn">確認</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // --- Prize pool (higher amount => lower probability) ---
         const PRIZES = [
             {text: "現金 200 元", weight: 40, sub: "小確幸天天來。"},
             {text: "現金 600 元", weight: 25, sub: "今天運氣不錯！"},
@@ -21,7 +429,6 @@
             {text: "Max 抱抱一次（價值 10）", weight: 30, sub: "限定一次，抱緊處理。"},
         ];
 
-        // --- Weighted random helper ---
         function pickWeighted(items) {
             const total = items.reduce((s, it) => s + (it.weight ?? 1), 0);
             let r = Math.random() * total;
@@ -42,6 +449,9 @@
         const resetBtn = document.getElementById("resetBtn");
         const revealBtn = document.getElementById("revealBtn");
         const hardResetBtn = document.getElementById("hardResetBtn");
+        const summaryModal = document.getElementById("summaryModal");
+        const summaryList = document.getElementById("summaryList");
+        const summaryConfirmBtn = document.getElementById("summaryConfirmBtn");
 
         const ctx = canvas.getContext("2d", {willReadFrequently: true});
         const COVER_IMAGE_SRC = "cover.png";
@@ -54,15 +464,15 @@
         let lastProgressCheckAt = 0;
         let coverImageReady = false;
 
-        // Config
-        const SCRATCH_RADIUS = 18;      // Brush size
-        const REVEAL_THRESHOLD = 0.50;  // Reveal when cleared >= 50%
-        const SAMPLE_STRIDE = 4;        // Performance: sample pixels with stride
+        const SCRATCH_RADIUS = 18;
+        const REVEAL_THRESHOLD = 0.35;
+        const SAMPLE_STRIDE = 4;
         const PROGRESS_UPDATE_INTERVAL = 90;
         const CLEAR_ALPHA_THRESHOLD = 24;
         const MAX_CANVAS_DPR = 2;
         const MAX_DRAWS = 3;
         const RESET_PASSCODE = "0818";
+        const SUMMARY_DELAY_MS = 3000;
         const ROUGH_LINE_AREA_FACTOR = 0.55;
         const ROUGH_DOT_AREA_FACTOR = 0.65;
 
@@ -74,6 +484,9 @@
         let drawCount = 0;
         let roughClearedArea = 0;
         let pixelReadFailed = false;
+        let drawHistory = [];
+        let summaryTimerId = 0;
+        let summaryCountdownId = 0;
 
         coverImage.addEventListener("load", () => {
             coverImageReady = true;
@@ -85,11 +498,7 @@
         });
         coverImage.src = COVER_IMAGE_SRC;
 
-        // ---------------------------
-        // Scratch logic
-        // ---------------------------
         function resizeCanvasToCard() {
-            // Match canvas resolution to element size for crisp scratching
             const rect = card.getBoundingClientRect();
             canvasCssWidth = rect.width;
             canvasCssHeight = rect.height;
@@ -99,15 +508,13 @@
             canvas.height = Math.round(canvasCssHeight * canvasDpr);
             canvas.style.width = canvasCssWidth + "px";
             canvas.style.height = canvasCssHeight + "px";
-            ctx.setTransform(canvasDpr, 0, 0, canvasDpr, 0, 0); // draw in CSS pixels
+            ctx.setTransform(canvasDpr, 0, 0, canvasDpr, 0, 0);
         }
 
         function drawCover() {
-            // Draw a scratch layer on top
             const w = canvasCssWidth || card.clientWidth;
             const h = canvasCssHeight || card.clientHeight;
 
-            // Cover base
             ctx.globalCompositeOperation = "source-over";
             ctx.clearRect(0, 0, w, h);
 
@@ -117,7 +524,6 @@
                 drawFallbackCover(w, h);
             }
 
-            // Hint strip
             ctx.fillStyle = "rgba(51,11,4,.38)";
             ctx.fillRect(0, h - 54, w, 54);
             ctx.fillStyle = "rgba(255,244,218,.98)";
@@ -126,7 +532,6 @@
             ctx.textBaseline = "middle";
             ctx.fillText("刮開看今年好運", w / 2, h - 27);
 
-            // Prepare erase mode
             ctx.globalCompositeOperation = "destination-out";
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
@@ -149,8 +554,8 @@
 
         function updateButtons() {
             const noMoreRounds = drawCount >= MAX_DRAWS;
-            resetBtn.disabled = noMoreRounds;
-            revealBtn.disabled = noMoreRounds || revealed;
+            resetBtn.disabled = !revealed || noMoreRounds;
+            revealBtn.disabled = revealed;
         }
 
         function drawCoverImage(w, h) {
@@ -172,7 +577,6 @@
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, w, h);
 
-            // Decorative ribbons
             ctx.globalAlpha = 0.2;
             ctx.fillStyle = "#8f1b06";
             for (let x = -h; x < w + h; x += 16) {
@@ -191,14 +595,46 @@
             prizeSub.textContent = currentPrize.sub ?? "";
         }
 
+        function showFinalSummaryPopup() {
+            if (drawHistory.length === 0) return;
+            summaryList.innerHTML = drawHistory
+                .map(
+                    (item, index) => `
+                        <li class="summary-item">
+                            <span class="summary-index">${index + 1}</span>
+                            <div>
+                                <div class="summary-prize">${item.text}</div>
+                                <div class="summary-note">${item.sub || "好運加碼中"}</div>
+                            </div>
+                        </li>
+                    `
+                )
+                .join("");
+            summaryModal.classList.add("show");
+            summaryModal.setAttribute("aria-hidden", "false");
+        }
+
+        function hideFinalSummaryPopup() {
+            summaryModal.classList.remove("show");
+            summaryModal.setAttribute("aria-hidden", "true");
+        }
+
+        function clearSummaryTimers() {
+            if (summaryTimerId) {
+                clearTimeout(summaryTimerId);
+                summaryTimerId = 0;
+            }
+            if (summaryCountdownId) {
+                clearInterval(summaryCountdownId);
+                summaryCountdownId = 0;
+            }
+        }
+
         function getPointFromEvent(e) {
             const rect = canvas.getBoundingClientRect();
-            const touch = e.touches && e.touches[0] ? e.touches[0] : null;
-            const clientX = touch ? touch.clientX : e.clientX;
-            const clientY = touch ? touch.clientY : e.clientY;
             return {
-                x: clientX - rect.left,
-                y: clientY - rect.top,
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
             };
         }
 
@@ -215,10 +651,12 @@
             const dx = to.x - from.x;
             const dy = to.y - from.y;
             const distance = Math.hypot(dx, dy);
+
             ctx.beginPath();
             ctx.moveTo(from.x, from.y);
             ctx.lineTo(to.x, to.y);
             ctx.stroke();
+
             roughClearedArea += distance * (SCRATCH_RADIUS * 2) * ROUGH_LINE_AREA_FACTOR;
             scratchDot(to.x, to.y);
         }
@@ -227,7 +665,6 @@
             const areaBase = (canvasCssWidth || card.clientWidth) * (canvasCssHeight || card.clientHeight);
             const roughRatio = areaBase > 0 ? Math.min(1, roughClearedArea / areaBase) : 0;
 
-            // Read pixel alpha and estimate cleared area
             if (!canvas.width || !canvas.height || pixelReadFailed) {
                 return roughRatio;
             }
@@ -238,11 +675,9 @@
                 const h = canvas.height;
                 const img = ctx.getImageData(0, 0, w, h).data;
                 const stride = Math.max(1, Math.round(SAMPLE_STRIDE * canvasDpr));
-
                 let total = 0;
                 let cleared = 0;
 
-                // Alpha channel is at i+3 (RGBA)
                 for (let y = 0; y < h; y += stride) {
                     for (let x = 0; x < w; x += stride) {
                         const i = (y * w + x) * 4 + 3;
@@ -255,6 +690,7 @@
                 pixelReadFailed = true;
                 console.warn("Canvas pixel read blocked, fallback to rough progress estimation.", err);
             }
+
             return Math.max(pixelRatio, roughRatio);
         }
 
@@ -293,27 +729,41 @@
             activePointerId = null;
             lastPoint = null;
 
-            statusEl.textContent = msg || "已揭曉";
+            const baseRevealMsg = msg || "已揭曉";
+            statusEl.textContent = baseRevealMsg;
             card.classList.toggle("jackpot", Boolean(currentPrize?.jackpot));
-
-            if (drawCount >= MAX_DRAWS) {
-                statusEl.textContent = `${statusEl.textContent}（已完成 3 次抽獎，請重製）`;
-            }
 
             if (progressRafId) {
                 cancelAnimationFrame(progressRafId);
                 progressRafId = 0;
             }
 
-            // Clear entire cover
             clearScratchLayer();
-
-            // Disable further scratching by keeping revealed flag
             progressBadge.textContent = "100%";
+
+            clearSummaryTimers();
+            if (drawCount >= MAX_DRAWS) {
+                let remainSec = Math.ceil(SUMMARY_DELAY_MS / 1000);
+                statusEl.textContent = `${baseRevealMsg}（${remainSec} 秒後顯示總結）`;
+                summaryCountdownId = setInterval(() => {
+                    remainSec -= 1;
+                    if (remainSec > 0) {
+                        statusEl.textContent = `${baseRevealMsg}（${remainSec} 秒後顯示總結）`;
+                    }
+                }, 1000);
+                summaryTimerId = setTimeout(() => {
+                    clearSummaryTimers();
+                    statusEl.textContent = `${baseRevealMsg}（已完成 3 次抽獎，請重製）`;
+                    showFinalSummaryPopup();
+                }, SUMMARY_DELAY_MS);
+            }
+
             updateButtons();
         }
 
         function startRound() {
+            clearSummaryTimers();
+            hideFinalSummaryPopup();
             if (drawCount >= MAX_DRAWS) {
                 statusEl.textContent = "已完成 3 次抽獎，請按「重製（需密碼）」並輸入 0818。";
                 updateButtons();
@@ -339,6 +789,7 @@
 
             card.classList.remove("jackpot");
             setPrize();
+            drawHistory.push({text: currentPrize.text, sub: currentPrize.sub ?? ""});
             resizeCanvasToCard();
             drawCover();
             updateDrawsBadge();
@@ -346,6 +797,7 @@
         }
 
         function hardReset() {
+            clearSummaryTimers();
             const input = window.prompt("請輸入重製密碼");
             if (input === null) return;
             if (input !== RESET_PASSCODE) {
@@ -354,11 +806,12 @@
             }
 
             drawCount = 0;
+            drawHistory = [];
             statusEl.textContent = "重製成功，開始新的 3 次抽獎。";
+            hideFinalSummaryPopup();
             startRound();
         }
 
-        // Pointer events (mouse, touch, pen)
         function onPointerDown(e) {
             if (revealed || isDown) return;
             e.preventDefault();
@@ -397,7 +850,6 @@
             requestProgressUpdate(true);
         }
 
-        // Bind events
         canvas.addEventListener("pointerdown", onPointerDown, {passive: false});
         canvas.addEventListener("pointermove", onPointerMove, {passive: false});
         canvas.addEventListener("pointerup", onPointerUp, {passive: false});
@@ -406,141 +858,17 @@
         resetBtn.addEventListener("click", startRound);
         revealBtn.addEventListener("click", () => revealAll("🐎 直接揭曉，馬上開運！"));
         hardResetBtn.addEventListener("click", hardReset);
+        summaryConfirmBtn.addEventListener("click", hideFinalSummaryPopup);
 
-        // Handle resize for scratch canvas only
         window.addEventListener("resize", () => {
             const wasRevealed = revealed;
             resizeCanvasToCard();
             if (!wasRevealed) drawCover();
-            else {
-                clearScratchLayer();
-            }
+            else clearScratchLayer();
         });
 
-        // Init
         startRound();
     </script>
 </body>
 
- = total > 0 ? cleared / total : 0;
-            } catch (err) {
-                pixelReadFailed = true;
-                console.warn("Canvas pixel read blocked, fallback to rough progress estimation.", err);
-            }
-            return Math.max(pixelRatio, roughRatio);
-        }
-
-        function requestProgressUpdate(force = false) {
-            const now = performance.now();
-            if (force || now - lastProgressCheckAt >= PROGRESS_UPDATE_INTERVAL) {
-                lastProgressCheckAt = now;
-                updateProgress();
-                return;
-            }
-            if (progressRafId) return;
-            progressRafId = requestAnimationFrame(() => {
-                progressRafId = 0;
-                lastProgressCheckAt = performance.now();
-                updateProgress();
-            });
-        }
-
-        function updateProgress() {
-            const ratio = estimateClearedRatio();
-            const pct = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-            const pctLabel = `${pct}%`;
-            if (progressBadge.textContent !== pctLabel) {
-                progressBadge.textContent = pctLabel;
-            }
-            if (!revealed && ratio >= REVEAL_THRESHOLD) {
-                revealAll("🧨 喜氣滿點，恭喜揭曉！");
-            }
-        }
-
-        function revealAll(msg) {
-            if (revealed) return;
-
-            revealed = true;
-            isDown = false;
-            activePointerId = null;
-            lastPoint = null;
-
-            statusEl.textContent = msg || "已揭曉";
-            card.classList.toggle("jackpot", Boolean(currentPrize?.jackpot));
-
-            if (drawCount >= MAX_DRAWS) {
-                statusEl.textContent = `${statusEl.textContent}（已完成 3 次抽獎，請重製）`;
-            }
-
-            if (progressRafId) {
-                cancelAnimationFrame(progressRafId);
-                progressRafId = 0;
-            }
-
-            // Clear entire cover
-            clearScratchLayer();
-
-            // Disable further scratching by keeping revealed flag
-            progressBadge.textContent = "100%";
-            updateButtons();
-        }
-
-        function startRound() {
-            if (drawCount >= MAX_DRAWS) {
-                statusEl.textContent = "已完成 3 次抽獎，請按「重製（需密碼）」並輸入 0818。";
-                updateButtons();
-                return;
-            }
-
-            drawCount++;
-            roughClearedArea = 0;
-            pixelReadFailed = false;
-            revealed = false;
-            isDown = false;
-            activePointerId = null;
-            lastPoint = null;
-            lastProgressCheckAt = 0;
-
-            if (progressRafId) {
-                cancelAnimationFrame(progressRafId);
-                progressRafId = 0;
-            }
-
-            statusEl.textContent = `第 ${drawCount} / ${MAX_DRAWS} 抽`;
-            progressBadge.textContent = "0%";
-
-            card.classList.remove("jackpot");
-            setPrize();
-            resizeCanvasToCard();
-            drawCover();
-            updateDrawsBadge();
-            updateButtons();
-        }
-
-        function hardReset() {
-            const input = window.prompt("請輸入重製密碼");
-            if (input === null) return;
-            if (input !== RESET_PASSCODE) {
-                statusEl.textContent = "密碼錯誤，無法重製。";
-                return;
-            }
-
-            drawCount = 0;
-            statusEl.textContent = "重製成功，開始新的 3 次抽獎。";
-            startRound();
-        }
-
-        // Pointer events (mouse, touch, pen)
-        function onPointerDown(e) {
-            if (revealed || isDown) return;
-            e.preventDefault();
-            activePointerId = e.pointerId;
-            isDown = true;
-            canvas.setPointerCapture?.(e.pointerId);
-            const p = getPointFromEvent(e);
-            lastPoint = p;
-            scratchDot(p.x, p.y);
-            requestProgressUpdate(true);
-        }
-
-        function onPointer
+</html>
