@@ -258,6 +258,9 @@
 
         .summary-card {
             width: min(92vw, 460px);
+            max-height: min(88vh, 760px);
+            display: flex;
+            flex-direction: column;
             border-radius: 20px;
             border: 2px solid rgba(255, 223, 152, .88);
             background:
@@ -296,6 +299,10 @@
             margin: 0;
             padding: 14px 18px 6px;
             list-style: none;
+            overflow: auto;
+            max-height: 52vh;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
         }
 
         .summary-item {
@@ -328,6 +335,9 @@
             font-size: 16px;
             font-weight: 700;
             color: #fff4d4;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .summary-note {
@@ -335,6 +345,9 @@
             font-size: 13px;
             color: #ffdca6;
             opacity: .92;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .summary-actions {
@@ -367,6 +380,53 @@
 
             .prize {
                 font-size: clamp(24px, 8.2vw, 34px);
+            }
+
+            .summary-modal {
+                padding: 10px;
+            }
+
+            .summary-card {
+                width: min(96vw, 460px);
+                max-height: 92vh;
+                border-radius: 16px;
+            }
+
+            .summary-head {
+                padding: 14px 14px 8px;
+            }
+
+            .summary-sub {
+                font-size: 13px;
+            }
+
+            .summary-list {
+                padding: 10px 12px 4px;
+                max-height: 58vh;
+            }
+
+            .summary-item {
+                grid-template-columns: 24px 1fr;
+                gap: 8px;
+                padding: 8px 0;
+            }
+
+            .summary-index {
+                width: 20px;
+                height: 20px;
+                font-size: 11px;
+            }
+
+            .summary-prize {
+                font-size: 14px;
+            }
+
+            .summary-note {
+                font-size: 12px;
+            }
+
+            .summary-actions {
+                padding: 10px 12px 14px;
             }
         }
     </style>
@@ -446,13 +506,24 @@
         ];
 
         function pickWeighted(items) {
-            const total = items.reduce((s, it) => s + (it.weight ?? 1), 0);
+            const total = items.reduce((s, it) => s + (it.currentWeight ?? it.weight ?? 1), 0);
             let r = Math.random() * total;
             for (const it of items) {
-                r -= (it.weight ?? 1);
+                r -= (it.currentWeight ?? it.weight ?? 1);
                 if (r <= 0) return it;
             }
             return items[items.length - 1];
+        }
+
+        function decayPrizeWeight(prize) {
+            const current = prize.currentWeight ?? prize.weight ?? 1;
+            prize.currentWeight = Math.max(MIN_DYNAMIC_WEIGHT, Math.round(current * WEIGHT_DECAY_FACTOR));
+        }
+
+        function resetPrizeWeights() {
+            for (const item of PRIZES) {
+                item.currentWeight = item.baseWeight ?? item.weight ?? 1;
+            }
         }
 
         const canvas = document.getElementById("scratch");
@@ -495,6 +566,8 @@
         const SUMMARY_DELAY_MS = 3000;
         const ROUGH_LINE_AREA_FACTOR = 0.55;
         const ROUGH_DOT_AREA_FACTOR = 0.65;
+        const WEIGHT_DECAY_FACTOR = 0.55;
+        const MIN_DYNAMIC_WEIGHT = 1;
 
         const coverImage = new Image();
         let canvasCssWidth = 0;
@@ -507,6 +580,11 @@
         let drawHistory = [];
         let summaryTimerId = 0;
         let summaryCountdownId = 0;
+
+        for (const item of PRIZES) {
+            item.baseWeight = item.weight ?? 1;
+            item.currentWeight = item.baseWeight;
+        }
 
         coverImage.addEventListener("load", () => {
             coverImageReady = true;
@@ -613,6 +691,7 @@
             currentPrize = pickWeighted(PRIZES);
             prizeText.textContent = currentPrize.text;
             prizeSub.textContent = currentPrize.sub ?? "";
+            decayPrizeWeight(currentPrize);
         }
 
         function showFinalSummaryPopup() {
@@ -647,7 +726,7 @@
                             <span class="summary-index">${index + 1}</span>
                             <div>
                                 <div class="summary-prize">${item.text}</div>
-                                <div class="summary-note">${item.sub || "—"}（權重 ${item.weight ?? 1}${item.jackpot ? " / 大獎" : ""}）</div>
+                                <div class="summary-note">${item.sub || "—"}（目前權重 ${item.currentWeight ?? item.weight ?? 1} / 原始 ${item.baseWeight ?? item.weight ?? 1}${item.jackpot ? " / 大獎" : ""}）</div>
                             </div>
                         </li>
                     `
@@ -850,6 +929,7 @@
 
             drawCount = 0;
             drawHistory = [];
+            resetPrizeWeights();
             statusEl.textContent = "重製成功，開始新的 3 次抽獎。";
             hideFinalSummaryPopup();
             startRound();
