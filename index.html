@@ -1,0 +1,546 @@
+ㄋesetBtn">再刮一張</button>
+            <button class="secondary" id="revealBtn">馬上揭曉</button>
+            <button class="secondary" id="hardResetBtn">重製（需密碼）</button>
+        </div>
+
+        <div class="status" id="status"></div>
+        <div class="blessing">Max Chang 祝你新年快樂 !</div>
+    </div>
+
+    <script>
+        // --- Prize pool (higher amount => lower probability) ---
+        const PRIZES = [
+            {text: "現金 200 元", weight: 40, sub: "小確幸天天來。"},
+            {text: "現金 600 元", weight: 25, sub: "今天運氣不錯！"},
+            {text: "美甲耗材補助 1000", weight: 12, sub: "漂亮事業加碼。"},
+            {text: "現金 1000 元", weight: 15, sub: "好運開始發酵。"},
+            {text: "現金 1200 元", weight: 10, sub: "手氣相當可以。"},
+            {text: "飾品任選一件（約 1200）", weight: 8, sub: "質感小心機。"},
+            {text: "現金 1600 元", weight: 5, sub: "大獎降臨！", jackpot: true},
+            {text: "服飾任選一件（約 1600）", weight: 4, sub: "直接升級穿搭。", jackpot: true},
+            {text: "Max 抱抱一次（價值 10）", weight: 30, sub: "限定一次，抱緊處理。"},
+        ];
+
+        // --- Weighted random helper ---
+        function pickWeighted(items) {
+            const total = items.reduce((s, it) => s + (it.weight ?? 1), 0);
+            let r = Math.random() * total;
+            for (const it of items) {
+                r -= (it.weight ?? 1);
+                if (r <= 0) return it;
+            }
+            return items[items.length - 1];
+        }
+
+        const canvas = document.getElementById("scratch");
+        const card = document.getElementById("card");
+        const prizeText = document.getElementById("prizeText");
+        const prizeSub = document.getElementById("prizeSub");
+        const statusEl = document.getElementById("status");
+        const progressBadge = document.getElementById("progressBadge");
+        const drawsBadge = document.getElementById("drawsBadge");
+        const resetBtn = document.getElementById("resetBtn");
+        const revealBtn = document.getElementById("revealBtn");
+        const hardResetBtn = document.getElementById("hardResetBtn");
+
+        const ctx = canvas.getContext("2d", {willReadFrequently: true});
+        const COVER_IMAGE_SRC = "cover.png";
+
+        let isDown = false;
+        let revealed = false;
+        let activePointerId = null;
+        let lastPoint = null;
+        let progressRafId = 0;
+        let lastProgressCheckAt = 0;
+        let coverImageReady = false;
+
+        // Config
+        const SCRATCH_RADIUS = 18;      // Brush size
+        const REVEAL_THRESHOLD = 0.50;  // Reveal when cleared >= 50%
+        const SAMPLE_STRIDE = 4;        // Performance: sample pixels with stride
+        const PROGRESS_UPDATE_INTERVAL = 90;
+        const CLEAR_ALPHA_THRESHOLD = 24;
+        const MAX_CANVAS_DPR = 2;
+        const MAX_DRAWS = 3;
+        const RESET_PASSCODE = "0818";
+        const ROUGH_LINE_AREA_FACTOR = 0.55;
+        const ROUGH_DOT_AREA_FACTOR = 0.65;
+
+        const coverImage = new Image();
+        let canvasCssWidth = 0;
+        let canvasCssHeight = 0;
+        let canvasDpr = 1;
+        let currentPrize = null;
+        let drawCount = 0;
+        let roughClearedArea = 0;
+        let pixelReadFailed = false;
+
+        coverImage.addEventListener("load", () => {
+            coverImageReady = true;
+            if (!revealed) drawCover();
+        });
+        coverImage.addEventListener("error", () => {
+            coverImageReady = false;
+            console.warn(`Failed to load cover image: ${COVER_IMAGE_SRC}`);
+        });
+        coverImage.src = COVER_IMAGE_SRC;
+
+        // ---------------------------
+        // Scratch logic
+        // ---------------------------
+        function resizeCanvasToCard() {
+            // Match canvas resolution to element size for crisp scratching
+            const rect = card.getBoundingClientRect();
+            canvasCssWidth = rect.width;
+            canvasCssHeight = rect.height;
+            canvasDpr = Math.min(MAX_CANVAS_DPR, Math.max(1, window.devicePixelRatio || 1));
+
+            canvas.width = Math.round(canvasCssWidth * canvasDpr);
+            canvas.height = Math.round(canvasCssHeight * canvasDpr);
+            canvas.style.width = canvasCssWidth + "px";
+            canvas.style.height = canvasCssHeight + "px";
+            ctx.setTransform(canvasDpr, 0, 0, canvasDpr, 0, 0); // draw in CSS pixels
+        }
+
+        function drawCover() {
+            // Draw a scratch layer on top
+            const w = canvasCssWidth || card.clientWidth;
+            const h = canvasCssHeight || card.clientHeight;
+
+            // Cover base
+            ctx.globalCompositeOperation = "source-over";
+            ctx.clearRect(0, 0, w, h);
+
+            if (coverImageReady && coverImage.naturalWidth > 0 && coverImage.naturalHeight > 0) {
+                drawCoverImage(w, h);
+            } else {
+                drawFallbackCover(w, h);
+            }
+
+            // Hint strip
+            ctx.fillStyle = "rgba(51,11,4,.38)";
+            ctx.fillRect(0, h - 54, w, 54);
+            ctx.fillStyle = "rgba(255,244,218,.98)";
+            ctx.font = "900 16px 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("刮開看今年好運", w / 2, h - 27);
+
+            // Prepare erase mode
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.lineWidth = SCRATCH_RADIUS * 2;
+            ctx.strokeStyle = "rgba(0,0,0,1)";
+            ctx.fillStyle = "rgba(0,0,0,1)";
+        }
+
+        function clearScratchLayer() {
+            const w = canvasCssWidth || card.clientWidth;
+            const h = canvasCssHeight || card.clientHeight;
+            ctx.globalCompositeOperation = "source-over";
+            ctx.clearRect(0, 0, w, h);
+        }
+
+        function updateDrawsBadge() {
+            const remaining = Math.max(0, MAX_DRAWS - drawCount);
+            drawsBadge.textContent = `剩餘 ${remaining} 次`;
+        }
+
+        function updateButtons() {
+            const noMoreRounds = drawCount >= MAX_DRAWS;
+            resetBtn.disabled = noMoreRounds;
+            revealBtn.disabled = noMoreRounds || revealed;
+        }
+
+        function drawCoverImage(w, h) {
+            const iw = coverImage.naturalWidth;
+            const ih = coverImage.naturalHeight;
+            const scale = Math.max(w / iw, h / ih);
+            const dw = iw * scale;
+            const dh = ih * scale;
+            const dx = (w - dw) * 0.5;
+            const dy = (h - dh) * 0.5;
+            ctx.drawImage(coverImage, dx, dy, dw, dh);
+        }
+
+        function drawFallbackCover(w, h) {
+            const grad = ctx.createLinearGradient(0, 0, w, h);
+            grad.addColorStop(0, "#ffe29a");
+            grad.addColorStop(0.55, "#ffc451");
+            grad.addColorStop(1, "#d68f16");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Decorative ribbons
+            ctx.globalAlpha = 0.2;
+            ctx.fillStyle = "#8f1b06";
+            for (let x = -h; x < w + h; x += 16) {
+                ctx.save();
+                ctx.translate(x, 0);
+                ctx.rotate((24 * Math.PI) / 180);
+                ctx.fillRect(0, 0, 8, h * 2);
+                ctx.restore();
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        function setPrize() {
+            currentPrize = pickWeighted(PRIZES);
+            prizeText.textContent = currentPrize.text;
+            prizeSub.textContent = currentPrize.sub ?? "";
+        }
+
+        function getPointFromEvent(e) {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches && e.touches[0] ? e.touches[0] : null;
+            const clientX = touch ? touch.clientX : e.clientX;
+            const clientY = touch ? touch.clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top,
+            };
+        }
+
+        function scratchDot(x, y) {
+            if (revealed) return;
+            ctx.beginPath();
+            ctx.arc(x, y, SCRATCH_RADIUS, 0, Math.PI * 2);
+            ctx.fill();
+            roughClearedArea += Math.PI * SCRATCH_RADIUS * SCRATCH_RADIUS * ROUGH_DOT_AREA_FACTOR;
+        }
+
+        function scratchLine(from, to) {
+            if (revealed) return;
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const distance = Math.hypot(dx, dy);
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(to.x, to.y);
+            ctx.stroke();
+            roughClearedArea += distance * (SCRATCH_RADIUS * 2) * ROUGH_LINE_AREA_FACTOR;
+            scratchDot(to.x, to.y);
+        }
+
+        function estimateClearedRatio() {
+            const areaBase = (canvasCssWidth || card.clientWidth) * (canvasCssHeight || card.clientHeight);
+            const roughRatio = areaBase > 0 ? Math.min(1, roughClearedArea / areaBase) : 0;
+
+            // Read pixel alpha and estimate cleared area
+            if (!canvas.width || !canvas.height || pixelReadFailed) {
+                return roughRatio;
+            }
+
+            let pixelRatio = 0;
+            try {
+                const w = canvas.width;
+                const h = canvas.height;
+                const img = ctx.getImageData(0, 0, w, h).data;
+                const stride = Math.max(1, Math.round(SAMPLE_STRIDE * canvasDpr));
+
+                let total = 0;
+                let cleared = 0;
+
+                // Alpha channel is at i+3 (RGBA)
+                for (let y = 0; y < h; y += stride) {
+                    for (let x = 0; x < w; x += stride) {
+                        const i = (y * w + x) * 4 + 3;
+                        total++;
+                        if (img[i] <= CLEAR_ALPHA_THRESHOLD) cleared++;
+                    }
+                }
+                pixelRatio = total > 0 ? cleared / total : 0;
+            } catch (err) {
+                pixelReadFailed = true;
+                console.warn("Canvas pixel read blocked, fallback to rough progress estimation.", err);
+            }
+            return Math.max(pixelRatio, roughRatio);
+        }
+
+        function requestProgressUpdate(force = false) {
+            const now = performance.now();
+            if (force || now - lastProgressCheckAt >= PROGRESS_UPDATE_INTERVAL) {
+                lastProgressCheckAt = now;
+                updateProgress();
+                return;
+            }
+            if (progressRafId) return;
+            progressRafId = requestAnimationFrame(() => {
+                progressRafId = 0;
+                lastProgressCheckAt = performance.now();
+                updateProgress();
+            });
+        }
+
+        function updateProgress() {
+            const ratio = estimateClearedRatio();
+            const pct = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+            const pctLabel = `${pct}%`;
+            if (progressBadge.textContent !== pctLabel) {
+                progressBadge.textContent = pctLabel;
+            }
+            if (!revealed && ratio >= REVEAL_THRESHOLD) {
+                revealAll("🧨 喜氣滿點，恭喜揭曉！");
+            }
+        }
+
+        function revealAll(msg) {
+            if (revealed) return;
+
+            revealed = true;
+            isDown = false;
+            activePointerId = null;
+            lastPoint = null;
+
+            statusEl.textContent = msg || "已揭曉";
+            card.classList.toggle("jackpot", Boolean(currentPrize?.jackpot));
+
+            if (drawCount >= MAX_DRAWS) {
+                statusEl.textContent = `${statusEl.textContent}（已完成 3 次抽獎，請重製）`;
+            }
+
+            if (progressRafId) {
+                cancelAnimationFrame(progressRafId);
+                progressRafId = 0;
+            }
+
+            // Clear entire cover
+            clearScratchLayer();
+
+            // Disable further scratching by keeping revealed flag
+            progressBadge.textContent = "100%";
+            updateButtons();
+        }
+
+        function startRound() {
+            if (drawCount >= MAX_DRAWS) {
+                statusEl.textContent = "已完成 3 次抽獎，請按「重製（需密碼）」並輸入 0818。";
+                updateButtons();
+                return;
+            }
+
+            drawCount++;
+            roughClearedArea = 0;
+            pixelReadFailed = false;
+            revealed = false;
+            isDown = false;
+            activePointerId = null;
+            lastPoint = null;
+            lastProgressCheckAt = 0;
+
+            if (progressRafId) {
+                cancelAnimationFrame(progressRafId);
+                progressRafId = 0;
+            }
+
+            statusEl.textContent = `第 ${drawCount} / ${MAX_DRAWS} 抽`;
+            progressBadge.textContent = "0%";
+
+            card.classList.remove("jackpot");
+            setPrize();
+            resizeCanvasToCard();
+            drawCover();
+            updateDrawsBadge();
+            updateButtons();
+        }
+
+        function hardReset() {
+            const input = window.prompt("請輸入重製密碼");
+            if (input === null) return;
+            if (input !== RESET_PASSCODE) {
+                statusEl.textContent = "密碼錯誤，無法重製。";
+                return;
+            }
+
+            drawCount = 0;
+            statusEl.textContent = "重製成功，開始新的 3 次抽獎。";
+            startRound();
+        }
+
+        // Pointer events (mouse, touch, pen)
+        function onPointerDown(e) {
+            if (revealed || isDown) return;
+            e.preventDefault();
+            activePointerId = e.pointerId;
+            isDown = true;
+            canvas.setPointerCapture?.(e.pointerId);
+            const p = getPointFromEvent(e);
+            lastPoint = p;
+            scratchDot(p.x, p.y);
+            requestProgressUpdate(true);
+        }
+
+        function onPointerMove(e) {
+            if (!isDown || e.pointerId !== activePointerId) return;
+            e.preventDefault();
+            const p = getPointFromEvent(e);
+            if (!lastPoint) {
+                lastPoint = p;
+                scratchDot(p.x, p.y);
+            } else {
+                scratchLine(lastPoint, p);
+                lastPoint = p;
+            }
+            requestProgressUpdate();
+        }
+
+        function onPointerUp(e) {
+            if (!isDown || e.pointerId !== activePointerId) return;
+            e.preventDefault();
+            if (canvas.hasPointerCapture?.(e.pointerId)) {
+                canvas.releasePointerCapture(e.pointerId);
+            }
+            isDown = false;
+            activePointerId = null;
+            lastPoint = null;
+            requestProgressUpdate(true);
+        }
+
+        // Bind events
+        canvas.addEventListener("pointerdown", onPointerDown, {passive: false});
+        canvas.addEventListener("pointermove", onPointerMove, {passive: false});
+        canvas.addEventListener("pointerup", onPointerUp, {passive: false});
+        canvas.addEventListener("pointercancel", onPointerUp, {passive: false});
+
+        resetBtn.addEventListener("click", startRound);
+        revealBtn.addEventListener("click", () => revealAll("🐎 直接揭曉，馬上開運！"));
+        hardResetBtn.addEventListener("click", hardReset);
+
+        // Handle resize for scratch canvas only
+        window.addEventListener("resize", () => {
+            const wasRevealed = revealed;
+            resizeCanvasToCard();
+            if (!wasRevealed) drawCover();
+            else {
+                clearScratchLayer();
+            }
+        });
+
+        // Init
+        startRound();
+    </script>
+</body>
+
+ = total > 0 ? cleared / total : 0;
+            } catch (err) {
+                pixelReadFailed = true;
+                console.warn("Canvas pixel read blocked, fallback to rough progress estimation.", err);
+            }
+            return Math.max(pixelRatio, roughRatio);
+        }
+
+        function requestProgressUpdate(force = false) {
+            const now = performance.now();
+            if (force || now - lastProgressCheckAt >= PROGRESS_UPDATE_INTERVAL) {
+                lastProgressCheckAt = now;
+                updateProgress();
+                return;
+            }
+            if (progressRafId) return;
+            progressRafId = requestAnimationFrame(() => {
+                progressRafId = 0;
+                lastProgressCheckAt = performance.now();
+                updateProgress();
+            });
+        }
+
+        function updateProgress() {
+            const ratio = estimateClearedRatio();
+            const pct = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+            const pctLabel = `${pct}%`;
+            if (progressBadge.textContent !== pctLabel) {
+                progressBadge.textContent = pctLabel;
+            }
+            if (!revealed && ratio >= REVEAL_THRESHOLD) {
+                revealAll("🧨 喜氣滿點，恭喜揭曉！");
+            }
+        }
+
+        function revealAll(msg) {
+            if (revealed) return;
+
+            revealed = true;
+            isDown = false;
+            activePointerId = null;
+            lastPoint = null;
+
+            statusEl.textContent = msg || "已揭曉";
+            card.classList.toggle("jackpot", Boolean(currentPrize?.jackpot));
+
+            if (drawCount >= MAX_DRAWS) {
+                statusEl.textContent = `${statusEl.textContent}（已完成 3 次抽獎，請重製）`;
+            }
+
+            if (progressRafId) {
+                cancelAnimationFrame(progressRafId);
+                progressRafId = 0;
+            }
+
+            // Clear entire cover
+            clearScratchLayer();
+
+            // Disable further scratching by keeping revealed flag
+            progressBadge.textContent = "100%";
+            updateButtons();
+        }
+
+        function startRound() {
+            if (drawCount >= MAX_DRAWS) {
+                statusEl.textContent = "已完成 3 次抽獎，請按「重製（需密碼）」並輸入 0818。";
+                updateButtons();
+                return;
+            }
+
+            drawCount++;
+            roughClearedArea = 0;
+            pixelReadFailed = false;
+            revealed = false;
+            isDown = false;
+            activePointerId = null;
+            lastPoint = null;
+            lastProgressCheckAt = 0;
+
+            if (progressRafId) {
+                cancelAnimationFrame(progressRafId);
+                progressRafId = 0;
+            }
+
+            statusEl.textContent = `第 ${drawCount} / ${MAX_DRAWS} 抽`;
+            progressBadge.textContent = "0%";
+
+            card.classList.remove("jackpot");
+            setPrize();
+            resizeCanvasToCard();
+            drawCover();
+            updateDrawsBadge();
+            updateButtons();
+        }
+
+        function hardReset() {
+            const input = window.prompt("請輸入重製密碼");
+            if (input === null) return;
+            if (input !== RESET_PASSCODE) {
+                statusEl.textContent = "密碼錯誤，無法重製。";
+                return;
+            }
+
+            drawCount = 0;
+            statusEl.textContent = "重製成功，開始新的 3 次抽獎。";
+            startRound();
+        }
+
+        // Pointer events (mouse, touch, pen)
+        function onPointerDown(e) {
+            if (revealed || isDown) return;
+            e.preventDefault();
+            activePointerId = e.pointerId;
+            isDown = true;
+            canvas.setPointerCapture?.(e.pointerId);
+            const p = getPointFromEvent(e);
+            lastPoint = p;
+            scratchDot(p.x, p.y);
+            requestProgressUpdate(true);
+        }
+
+        function onPointer
