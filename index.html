@@ -397,6 +397,7 @@
             <button id="resetBtn">再刮一張</button>
             <button class="secondary" id="revealBtn">馬上揭曉</button>
             <button class="secondary" id="hardResetBtn">重製（需密碼）</button>
+            <button class="secondary" id="prizeCatalogBtn">查看獎品列表</button>
         </div>
 
         <div class="status" id="status"></div>
@@ -412,6 +413,19 @@
             <ul class="summary-list" id="summaryList"></ul>
             <div class="summary-actions">
                 <button type="button" class="summary-confirm" id="summaryConfirmBtn">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="summary-modal" id="prizeCatalogModal" aria-hidden="true">
+        <div class="summary-card">
+            <div class="summary-head">
+                <h2 class="summary-title">全部獎品列表</h2>
+                <div class="summary-sub">以下是本次刮刮樂所有可抽中的獎項</div>
+            </div>
+            <ul class="summary-list" id="prizeCatalogList"></ul>
+            <div class="summary-actions">
+                <button type="button" class="summary-confirm" id="prizeCatalogConfirmBtn">確認</button>
             </div>
         </div>
     </div>
@@ -451,9 +465,13 @@
         const resetBtn = document.getElementById("resetBtn");
         const revealBtn = document.getElementById("revealBtn");
         const hardResetBtn = document.getElementById("hardResetBtn");
+        const prizeCatalogBtn = document.getElementById("prizeCatalogBtn");
         const summaryModal = document.getElementById("summaryModal");
         const summaryList = document.getElementById("summaryList");
         const summaryConfirmBtn = document.getElementById("summaryConfirmBtn");
+        const prizeCatalogModal = document.getElementById("prizeCatalogModal");
+        const prizeCatalogList = document.getElementById("prizeCatalogList");
+        const prizeCatalogConfirmBtn = document.getElementById("prizeCatalogConfirmBtn");
 
         const ctx = canvas.getContext("2d", {willReadFrequently: true});
         const COVER_IMAGE_SRC = "cover.png";
@@ -619,6 +637,29 @@
         function hideFinalSummaryPopup() {
             summaryModal.classList.remove("show");
             summaryModal.setAttribute("aria-hidden", "true");
+        }
+
+        function showPrizeCatalogPopup() {
+            prizeCatalogList.innerHTML = PRIZES
+                .map(
+                    (item, index) => `
+                        <li class="summary-item">
+                            <span class="summary-index">${index + 1}</span>
+                            <div>
+                                <div class="summary-prize">${item.text}</div>
+                                <div class="summary-note">${item.sub || "—"}（權重 ${item.weight ?? 1}${item.jackpot ? " / 大獎" : ""}）</div>
+                            </div>
+                        </li>
+                    `
+                )
+                .join("");
+            prizeCatalogModal.classList.add("show");
+            prizeCatalogModal.setAttribute("aria-hidden", "false");
+        }
+
+        function hidePrizeCatalogPopup() {
+            prizeCatalogModal.classList.remove("show");
+            prizeCatalogModal.setAttribute("aria-hidden", "true");
         }
 
         function clearSummaryTimers() {
@@ -860,7 +901,9 @@
         resetBtn.addEventListener("click", startRound);
         revealBtn.addEventListener("click", () => revealAll("🐎 直接揭曉，馬上開運！"));
         hardResetBtn.addEventListener("click", hardReset);
+        prizeCatalogBtn.addEventListener("click", showPrizeCatalogPopup);
         summaryConfirmBtn.addEventListener("click", hideFinalSummaryPopup);
+        prizeCatalogConfirmBtn.addEventListener("click", hidePrizeCatalogPopup);
 
         window.addEventListener("resize", () => {
             const wasRevealed = revealed;
